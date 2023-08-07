@@ -45,11 +45,11 @@
 #include <openssl/sha.h>
 #include <openssl/asn1.h>
 #include <openssl/pem.h>
+
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER)
 #include <openssl/asn1t.h>
-#include <openssl/cms.h>
-#if OPENSSL_VERSION_NUMBER >= 0x30000000L
-#include <openssl/core_names.h>
-#include <openssl/decoder.h>
+#else
+#include <openssl/asn1_mac.h>
 #endif
 
 #define DN_BUF_LEN  256
@@ -84,11 +84,11 @@ struct _pkinit_identity_crypto_context {
     char *token_label;
     char *cert_label;
     /* These are crypto-specific */
-    struct plugin_file_handle *p11_module;
+    void *p11_module;
     CK_SESSION_HANDLE session;
     CK_FUNCTION_LIST_PTR p11;
-    uint8_t *cert_id;
-    size_t cert_id_len;
+    CK_BYTE_PTR cert_id;
+    int cert_id_len;
     CK_MECHANISM_TYPE mech;
 #endif
     krb5_boolean defer_id_prompt;
@@ -96,12 +96,9 @@ struct _pkinit_identity_crypto_context {
 };
 
 struct _pkinit_plg_crypto_context {
-    EVP_PKEY *dh_1024;
-    EVP_PKEY *dh_2048;
-    EVP_PKEY *dh_4096;
-    EVP_PKEY *ec_p256;
-    EVP_PKEY *ec_p384;
-    EVP_PKEY *ec_p521;
+    DH *dh_1024;
+    DH *dh_2048;
+    DH *dh_4096;
     ASN1_OBJECT *id_pkinit_authData;
     ASN1_OBJECT *id_pkinit_DHKeyData;
     ASN1_OBJECT *id_pkinit_rkeyData;
@@ -115,7 +112,26 @@ struct _pkinit_plg_crypto_context {
 
 struct _pkinit_req_crypto_context {
     X509 *received_cert;
-    EVP_PKEY *client_pkey;
+    DH *dh;
+};
+
+#define CERT_MAGIC 0x53534c43
+struct _pkinit_cert_data {
+    unsigned int magic;
+    pkinit_plg_crypto_context plgctx;
+    pkinit_req_crypto_context reqctx;
+    pkinit_identity_crypto_context idctx;
+    pkinit_cred_info cred;
+    unsigned int index;	    /* Index of this cred in the creds[] array */
+};
+
+#define ITER_MAGIC 0x53534c49
+struct _pkinit_cert_iter_data {
+    unsigned int magic;
+    pkinit_plg_crypto_context plgctx;
+    pkinit_req_crypto_context reqctx;
+    pkinit_identity_crypto_context idctx;
+    unsigned int index;
 };
 
 #endif	/* _PKINIT_CRYPTO_OPENSSL_H */
